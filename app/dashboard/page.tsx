@@ -1,60 +1,105 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useAuthStore } from "@/app/store/authStore";
+import { useState } from "react";
+import useSWR from "swr";
+import { 
+  AreaChart, Area, 
+  BarChart, Bar, 
+  PieChart, Pie, Cell, 
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, 
+  ResponsiveContainer 
+} from 'recharts';
+
+const fetcher = (url: string) => fetch(url).then(res => res.json());
 
 const pageStyles = `
   @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
+    from { opacity: 0; transform: translateY(12px); }
     to { opacity: 1; transform: translateY(0); }
   }
 
+  @keyframes glowPulse {
+    0%, 100% { box-shadow: 0 0 15px rgba(99,102,241,0.15); }
+    50% { box-shadow: 0 0 25px rgba(99,102,241,0.25); }
+  }
+
   .dash-header {
-    margin-bottom: 2rem;
+    margin-bottom: 2.5rem;
     animation: fadeIn 0.4s ease both;
   }
 
   .dash-title {
-    font-family: var(--font-display, 'DM Serif Display', serif);
-    font-size: 2rem;
+    font-size: 2.25rem;
+    font-weight: 700;
     margin: 0 0 0.5rem 0;
     color: var(--dash-text);
+    letter-spacing: -0.03em;
+  }
+
+  .gradient-text {
+    background: linear-gradient(135deg, #6366F1 0%, #A855F7 50%, #EC4899 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 
   .dash-subtitle {
     font-size: 14px;
     color: var(--dash-text-muted);
     margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .live-indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #22C55E;
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
+    animation: pulse 2s infinite;
+  }
+  
+  @keyframes pulse {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5); }
+    70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
   }
 
   .metrics-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 2rem;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 1.5rem;
   }
 
   .metric-card {
-    background: var(--dash-surface);
+    background: #1E293B;
+    backdrop-filter: blur(12px);
     border: 1px solid var(--dash-border);
     border-radius: 16px;
     padding: 1.5rem;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.03);
     display: flex;
     flex-direction: column;
     animation: fadeIn 0.5s ease both;
-    transition: transform 0.2s, box-shadow 0.2s;
-  }
-  
-  .metric-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 30px rgba(0,0,0,0.06);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
   }
 
   .metric-card:nth-child(1) { animation-delay: 0.05s; }
-  .metric-card:nth-child(2) { animation-delay: 0.1s; }
+  .metric-card:nth-child(2) { animation-delay: 0.10s; }
   .metric-card:nth-child(3) { animation-delay: 0.15s; }
-  .metric-card:nth-child(4) { animation-delay: 0.2s; }
+  .metric-card:nth-child(4) { animation-delay: 0.20s; }
+  
+  .metric-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(99,102,241,0.2);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+  }
 
   .metric-header {
     display: flex;
@@ -64,31 +109,35 @@ const pageStyles = `
   }
 
   .metric-title {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     color: var(--dash-text-muted);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.08em;
   }
 
   .metric-icon {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-    background: var(--dash-accent-light);
-    color: var(--dash-accent);
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
   }
   .metric-icon svg { width: 18px; height: 18px; }
 
+  .metric-card:nth-child(1) .metric-icon { background: rgba(99,102,241,0.15); color: #818CF8; }
+  .metric-card:nth-child(2) .metric-icon { background: rgba(168,85,247,0.15); color: #C084FC; }
+  .metric-card:nth-child(3) .metric-icon { background: rgba(6,182,212,0.15); color: #22D3EE; }
+  .metric-card:nth-child(4) .metric-icon { background: rgba(244,63,94,0.15); color: #FB7185; }
+
   .metric-value {
     font-size: 2rem;
-    font-weight: 600;
+    font-weight: 700;
     color: var(--dash-text);
     margin: 0 0 0.5rem 0;
     line-height: 1;
+    letter-spacing: -0.02em;
   }
 
   .metric-trend {
@@ -98,67 +147,63 @@ const pageStyles = `
     align-items: center;
     gap: 4px;
   }
-  .trend-up { color: var(--dash-accent); }
-  .trend-down { color: #C0392B; }
+  .trend-up { color: #22C55E; }
+  .trend-down { color: #F43F5E; }
 
   .bento-grid {
     display: grid;
     grid-template-columns: 2fr 1fr;
-    gap: 1.5rem;
+    gap: 1.25rem;
+    margin-bottom: 1.25rem;
   }
   @media (max-width: 1024px) { .bento-grid { grid-template-columns: 1fr; } }
 
   .bento-card {
-    background: var(--dash-surface);
+    background: #1E293B;
+    backdrop-filter: blur(12px);
     border: 1px solid var(--dash-border);
     border-radius: 16px;
     padding: 1.5rem;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.03);
     animation: fadeIn 0.6s ease both;
     animation-delay: 0.25s;
+    display: flex;
+    flex-direction: column;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .bento-card:hover {
+    border-color: rgba(99,102,241,0.15);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.2);
   }
 
   .card-title {
     font-size: 16px;
     font-weight: 600;
-    margin: 0 0 1.5rem 0;
+    margin: 0 0 0.25rem 0;
     color: var(--dash-text);
   }
+  
+  .card-subtitle {
+    font-size: 13px;
+    color: var(--dash-text-muted);
+    margin: 0 0 1.5rem 0;
+  }
 
-  /* Pipeline Bar */
-  .pipeline-wrap { width: 100%; }
-  .pipeline-bar {
-    display: flex;
-    height: 24px;
-    border-radius: 12px;
-    overflow: hidden;
-    margin-bottom: 1rem;
+  .chart-wrapper {
+    width: 100%;
+    height: 300px;
+    flex: 1;
+    min-height: 250px;
   }
-  .pipe-seg {
-    height: 100%;
-    transition: width 1s cubic-bezier(0.2, 0.8, 0.2, 1);
-  }
-  .pipe-lead { background: #3498DB; width: 30%; }
-  .pipe-qual { background: #F39C12; width: 25%; }
-  .pipe-prop { background: #9B59B6; width: 20%; }
-  .pipe-won  { background: var(--dash-accent); width: 25%; }
-
-  .pipe-legend {
-    display: flex;
-    gap: 1.5rem;
-    flex-wrap: wrap;
-    font-size: 12px;
-  }
-  .legend-item {
-    display: flex; align-items: center; gap: 6px; color: var(--dash-text-muted);
-  }
-  .dot { width: 8px; height: 8px; border-radius: 50%; }
 
   /* Activity Feed */
   .feed-list {
     display: flex;
     flex-direction: column;
     gap: 1.25rem;
+    max-height: 360px;
+    overflow-y: auto;
+    padding-right: 8px;
   }
   .feed-item {
     display: flex;
@@ -186,30 +231,106 @@ const pageStyles = `
   .feed-subject { font-size: 13px; font-weight: 600; color: var(--dash-text); }
   .feed-time { font-size: 11px; color: var(--dash-text-muted); }
   .feed-desc { font-size: 12px; color: var(--dash-text-muted); line-height: 1.4; }
+  
+  /* Customizing Recharts Tooltip */
+  .custom-tooltip {
+    background: #1E293B;
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(99,102,241,0.2);
+    border-radius: 12px;
+    padding: 12px 16px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  }
+  .tooltip-label {
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--dash-text);
+    font-size: 13px;
+    border-bottom: 1px solid var(--dash-border);
+    padding-bottom: 6px;
+  }
+  .tooltip-item {
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+    color: var(--dash-text-muted);
+  }
 `;
+
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="custom-tooltip">
+        <div className="tooltip-label">{label}</div>
+        {payload.map((entry: any, index: number) => (
+          <div key={index} className="tooltip-item">
+            <span style={{ color: entry.color }}>●</span>
+            {entry.name}: <strong style={{ color: varDashText(entry.color) }}>
+              {entry.name.includes("Amount") || entry.name.includes("Value") || entry.name.includes("Revenue") || entry.name.includes("Sum") 
+                ? '$' + entry.value.toLocaleString() 
+                : entry.value}
+            </strong>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
+// Helper for the tooltip text color purely based on dark/light but we'll return entry color here to keep it simple
+const varDashText = (fallback: string) => fallback; 
 
 export default function DashboardOverview() {
   const { user } = useAuthStore();
-  
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!user?.company_id) return;
-    
-    fetch(`/api/dashboard?companyId=${user.company_id}`)
-      .then(res => res.json())
-      .then(json => {
-        if (json.metrics) setData(json);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error("Dashboard DB fetch error:", err);
-        setLoading(false);
+  const { data, error, isLoading, mutate } = useSWR(
+    user?.company_id ? `/api/dashboard?companyId=${user.company_id}` : null, 
+    fetcher,
+    { refreshInterval: 15000 } // Poll every 15s for "near real-time" effect
+  );
+
+  const [saleTitle, setSaleTitle] = useState("");
+  const [saleValue, setSaleValue] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleQuickSale = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!saleTitle || !saleValue) return;
+    setIsSubmitting(true);
+    try {
+      await fetch("/api/opportunities", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyId: user?.company_id,
+          title: saleTitle,
+          value: Number(saleValue),
+          stage: "closed_won"
+        })
       });
-  }, [user]);
+      setSaleTitle("");
+      setSaleValue("");
+      mutate(); // Instantly refresh SWR visuals
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-  // Fallbacks while loading or if data fails
+  if (isLoading && !data) {
+    return (
+      <div style={{ padding: '2rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div className="live-indicator"></div> 
+        <span style={{ color: 'var(--dash-text-muted)' }}>Syncing live database metrics...</span>
+      </div>
+    );
+  }
+
+  // Safe destructuring with fallbacks
   const MOCK_METRICS = data?.metrics || {
     contacts: 0,
     activeOps: 0,
@@ -219,24 +340,22 @@ export default function DashboardOverview() {
 
   const ACTIVITIES = data?.activities || [];
   
-  const STAGES = data?.pipelineBreakdown || {
-    leadPercent: 30,
-    qualPercent: 25,
-    propPercent: 20,
-    wonPercent: 25
-  };
-
-  if (loading) {
-    return <div style={{ padding: '2rem', color: 'var(--dash-text-muted)' }}>Loading live database metrics...</div>;
-  }
+  const REVENUE_DATA = data?.revenueForecast || [];
+  
+  const PIPELINE_DIST = data?.pipelineBreakdown?.distribution || [];
+  
+  const TEAM_PROD = data?.teamProductivity || [];
 
   return (
     <>
       <style>{pageStyles}</style>
-      
+
       <header className="dash-header">
-        <h1 className="dash-title">Good afternoon, {user?.employee_id || "User"}</h1>
-        <p className="dash-subtitle">Here&apos;s what&apos;s happening in your workspace today.</p>
+        <h1 className="dash-title">Good afternoon, <span className="gradient-text">{user?.employee_id || "User"}</span></h1>
+        <p className="dash-subtitle">
+          <span className="live-indicator"></span>
+          Live streaming your workspace analytics
+        </p>
       </header>
 
       <section className="metrics-grid">
@@ -248,7 +367,7 @@ export default function DashboardOverview() {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
             </div>
           </div>
-          <h2 className="metric-value">${(MOCK_METRICS.pipelineVal / 1000).toFixed(0)}k</h2>
+          <h2 className="metric-value">₹{(MOCK_METRICS.pipelineVal / 1000).toFixed(0)}k</h2>
           <div className="metric-trend trend-up">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline><polyline points="16 7 22 7 22 13"></polyline></svg>
             Live from Database
@@ -266,7 +385,7 @@ export default function DashboardOverview() {
           <h2 className="metric-value">{MOCK_METRICS.activeOps}</h2>
           <div className="metric-trend trend-up">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline><polyline points="16 7 22 7 22 13"></polyline></svg>
-            Live from Database
+            Live
           </div>
         </div>
 
@@ -281,7 +400,7 @@ export default function DashboardOverview() {
           <h2 className="metric-value">{MOCK_METRICS.contacts}</h2>
           <div className="metric-trend trend-up">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline><polyline points="16 7 22 7 22 13"></polyline></svg>
-            Live from Database
+            Live
           </div>
         </div>
 
@@ -296,57 +415,134 @@ export default function DashboardOverview() {
           <h2 className="metric-value">{MOCK_METRICS.openTickets}</h2>
           <div className="metric-trend trend-down">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"></polyline><polyline points="16 17 22 17 22 11"></polyline></svg>
-            Live from Database
+            Action Needed
           </div>
         </div>
       </section>
 
+      {/* CHARTS LAYER 1 */}
       <section className="bento-grid">
-        {/* Pipeline Chart */}
+        {/* Revenue Forecast AreaChart */}
         <div className="bento-card">
-          <h3 className="card-title">Opportunity Pipeline by Stage</h3>
-          <div className="pipeline-wrap">
-            <div className="pipeline-bar">
-              <div className="pipe-seg pipe-lead" style={{ width: `${STAGES.leadPercent}%` }} title={`Leads: ${STAGES.leadPercent}%`}></div>
-              <div className="pipe-seg pipe-qual" style={{ width: `${STAGES.qualPercent}%` }} title={`Qualified: ${STAGES.qualPercent}%`}></div>
-              <div className="pipe-seg pipe-prop" style={{ width: `${STAGES.propPercent}%` }} title={`Proposal: ${STAGES.propPercent}%`}></div>
-              <div className="pipe-seg pipe-won"  style={{ width: `${STAGES.wonPercent}%` }} title={`Closed Won: ${STAGES.wonPercent}%`}></div>
-            </div>
-            <div className="pipe-legend">
-              <div className="legend-item"><div className="dot" style={{background: '#3498DB'}}></div> Lead ({STAGES.leadPercent}%)</div>
-              <div className="legend-item"><div className="dot" style={{background: '#F39C12'}}></div> Qualified ({STAGES.qualPercent}%)</div>
-              <div className="legend-item"><div className="dot" style={{background: '#9B59B6'}}></div> Proposal ({STAGES.propPercent}%)</div>
-              <div className="legend-item"><div className="dot" style={{background: 'var(--dash-accent)'}}></div> Closed Won ({STAGES.wonPercent}%)</div>
-            </div>
+          <h3 className="card-title">Revenue Forecast</h3>
+          <p className="card-subtitle">Predicted deals and historic closed-won revenue by expectation month.</p>
+          <div className="chart-wrapper">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={REVENUE_DATA} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorWon" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#6366F1" stopOpacity={0.6}/>
+                    <stop offset="95%" stopColor="#6366F1" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="colorPipe" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#22D3EE" stopOpacity={0.4}/>
+                    <stop offset="95%" stopColor="#22D3EE" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="month" stroke="#475569" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis stroke="#475569" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `₹${(val/1000)}k`} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.04)" />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend verticalAlign="top" height={36}/>
+                <Area type="monotone" dataKey="wonSum" name="Closed Won (₹)" stroke="#818CF8" fillOpacity={1} fill="url(#colorWon)" activeDot={{ r: 6, fill: '#6366F1', stroke: '#818CF8', strokeWidth: 2 }}/>
+                <Area type="monotone" dataKey="pipelineSum" name="Pipeline Value (₹)" stroke="#22D3EE" fillOpacity={1} fill="url(#colorPipe)" />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
-          <p style={{ fontSize: '13px', color: 'var(--dash-text-muted)', margin: '1.5rem 0 0 0', lineHeight: 1.5 }}>
-            You have {MOCK_METRICS.activeOps} active deals in motion across your funnel tracking against Live Records.
-          </p>
         </div>
 
-        {/* Activity Feed */}
+        {/* Sales Performance PieChart */}
         <div className="bento-card">
-          <h3 className="card-title">Recent Activity</h3>
-          <div className="feed-list">
-            {ACTIVITIES.map((act: any) => (
-              <div className="feed-item" key={act.id}>
-                <div className="feed-icon" style={{ color: act.color, borderColor: `${act.color}40`, background: `${act.color}10` }}>
-                  {act.type === 'call' && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>}
-                  {act.type === 'email' && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>}
-                  {act.type === 'stage_change' && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"></polyline></svg>}
-                  {act.type === 'ticket' && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>}
-                  {act.type === 'note' && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>}
-                </div>
-                <div className="feed-content">
-                  <div className="feed-header">
-                    <span className="feed-subject">{act.subject}</span>
-                    <span className="feed-time">{act.time}</span>
-                  </div>
-                  <div className="feed-desc">{act.desc}</div>
-                </div>
-              </div>
-            ))}
+          <h3 className="card-title">Deals by Stage</h3>
+          <p className="card-subtitle">Distribution of all active opportunities.</p>
+          <div className="chart-wrapper" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Tooltip content={<CustomTooltip />} />
+                <Pie
+                  data={PIPELINE_DIST}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={90}
+                  paddingAngle={5}
+                  dataKey="value"
+                  animationDuration={1500}
+                >
+                  {PIPELINE_DIST.map((entry: any, index: number) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  ))}
+                </Pie>
+                <Legend verticalAlign="bottom" height={36}/>
+              </PieChart>
+            </ResponsiveContainer>
           </div>
+        </div>
+      </section>
+
+      {/* CHARTS LAYER 2 */}
+      <section className="bento-grid">
+        {/* Team Productivity BarChart */}
+        <div className="bento-card">
+          <h3 className="card-title">Team Productivity Stats</h3>
+          <p className="card-subtitle">Comparing assigned deals and logged activities across your team.</p>
+          <div className="chart-wrapper">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={TEAM_PROD} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.04)" />
+                <XAxis dataKey="name" stroke="#475569" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis yAxisId="left" orientation="left" stroke="#475569" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis yAxisId="right" orientation="right" stroke="#475569" fontSize={12} tickLine={false} axisLine={false} />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(99,102,241,0.06)' }} />
+                <Legend verticalAlign="top" height={36}/>
+                <Bar yAxisId="left" dataKey="deals" name="Deals Assigned" fill="#A855F7" radius={[6, 6, 0, 0]} animationDuration={1500} />
+                <Bar yAxisId="right" dataKey="activities" name="Logged Activities" fill="#F59E0B" radius={[6, 6, 0, 0]} animationDuration={1500} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Quick Log Sale Form */}
+        <div className="bento-card">
+          <h3 className="card-title">Quick Log Sale</h3>
+          <p className="card-subtitle">Instantly record revenue to update dashboard metrics.</p>
+          
+          <form style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }} onSubmit={handleQuickSale}>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--dash-text-muted)', marginBottom: '6px' }}>Client / Deal Name</label>
+              <input 
+                type="text" 
+                required 
+                value={saleTitle}
+                onChange={(e) => setSaleTitle(e.target.value)}
+                placeholder="e.g. Enterprise License Q4"
+                style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid var(--dash-border)', background: 'var(--dash-bg)', color: 'var(--dash-text)', fontSize: '13px', outline: 'none' }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--dash-text-muted)', marginBottom: '6px' }}>Total Value (₹)</label>
+              <input 
+                type="number" 
+                required 
+                min="0"
+                value={saleValue}
+                onChange={(e) => setSaleValue(e.target.value)}
+                placeholder="25000"
+                style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid var(--dash-border)', background: 'var(--dash-bg)', color: 'var(--dash-text)', fontSize: '13px', outline: 'none' }}
+              />
+            </div>
+            
+            <button 
+              type="submit" 
+              disabled={isSubmitting}
+              style={{
+                marginTop: 'auto',
+                background: 'transparent', border: '1px solid #475569', color: '#E2E8F0', padding: '12px 16px', borderRadius: '10px', fontSize: '14px', fontWeight: 600, cursor: isSubmitting ? 'not-allowed' : 'pointer', transition: 'all 0.3s', opacity: isSubmitting ? 0.7 : 1, letterSpacing: '-0.01em', boxShadow: 'none'
+              }}
+            >
+              {isSubmitting ? "Logging Deal..." : "Log Closed Won Deal"}
+            </button>
+          </form>
         </div>
       </section>
     </>

@@ -10,6 +10,7 @@ export interface AuthUser {
 export interface AuthState {
   accessToken: string | null;
   user: AuthUser | null;
+  isRestoring: boolean;
   setAuth: (data: { accessToken: string; user: AuthUser }) => void;
   clearAuth: () => void;
 }
@@ -17,6 +18,7 @@ export interface AuthState {
 export const useAuthStore = create<AuthState>((set) => ({
   accessToken: null,
   user: null,
+  isRestoring: false,
   setAuth: ({ accessToken, user }) => set({ accessToken, user }),
   clearAuth: () => set({ accessToken: null, user: null }),
 }));

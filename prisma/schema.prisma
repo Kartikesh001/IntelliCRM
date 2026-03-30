@@ -10,6 +10,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 //////////////////////////////////////////////////
@@ -93,6 +94,9 @@ model Company {
   customFields  CustomFieldDefinition[]
 
   activities    ActivityLog[]   // ✅ ADD THIS
+  dashboards    ReportDashboard[]
+  campaigns     Campaign[]
+  jobs          JobQueue[]
 }
 
 //////////////////////////////////////////////////
@@ -119,6 +123,7 @@ model User {
   ticketsAssigned        Ticket[]       @relation("AssignedTickets")
 
   activities             ActivityLog[]  // ✅ ADD THIS
+  dashboards             ReportDashboard[]
 
   @@unique([companyId, employeeId])
 }
@@ -264,4 +269,85 @@ model WorkflowRule {
   createdAt  DateTime @default(now())
 
   company    Company @relation(fields: [companyId], references: [companyId], onDelete: Cascade)
+}
+
+//////////////////////////////////////////////////
+// NATIVE JOB QUEUE (BACKGROUND WORKERS)
+//////////////////////////////////////////////////
+
+model JobQueue {
+  id         String   @id @default(uuid())
+  companyId  String
+  type       String   
+  payload    Json     @default("{}")
+  status     String   @default("pending") // pending, processing, completed, failed
+  error      String?
+  runAt      DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  company    Company @relation(fields: [companyId], references: [companyId], onDelete: Cascade)
+}
+
+//////////////////////////////////////////////////
+// SALES & MARKETING (CAMPAIGNS)
+//////////////////////////////////////////////////
+
+model Campaign {
+  id             String    @id @default(uuid())
+  companyId      String
+  name           String
+  type           String    @default("email")
+  status         String    @default("active")
+  
+  budget         Float     @default(0)
+  spent          Float     @default(0)
+  roi            Float     @default(0)
+  
+  expectedLeads  Int       @default(0)
+  generatedLeads Int       @default(0)
+  
+  startDate      DateTime?
+  endDate        DateTime?
+  
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  company        Company   @relation(fields: [companyId], references: [companyId], onDelete: Cascade)
+}
+
+//////////////////////////////////////////////////
+// REPORTING & ANALYTICS
+//////////////////////////////////////////////////
+
+model ReportDashboard {
+  id          String   @id @default(uuid())
+  companyId   String
+  ownerId     String?  
+  name        String
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company     Company  @relation(fields: [companyId], references: [companyId], onDelete: Cascade)
+  user        User?    @relation(fields: [ownerId], references: [id])
+  widgets     DashboardWidget[]
+}
+
+model DashboardWidget {
+  id              String   @id @default(uuid())
+  dashboardId     String
+  type            String   // 'bar', 'line', 'pie', 'kpi_card'
+  metric          String   // 'sales_performance', 'revenue_forecast', 'team_productivity'
+  title           String
+  
+  config          Json     @default("{}") 
+  refreshRateMode String   @default("realtime") 
+
+  positionX       Int      @default(0)
+  positionY       Int      @default(0)
+  width           Int      @default(2)
+  height          Int      @default(2)
+
+  dashboard       ReportDashboard @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
 }

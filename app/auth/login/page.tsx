@@ -21,7 +21,8 @@ import { loginUser } from "../auth.service";
 import { useAuthStore } from "@/app/store/authStore";
 
    
-const RULES = {
+type Rule = { test: (v: string) => boolean; msg: string; };
+const RULES: Record<string, Rule[]> = {
   company_id: [
     { test: (v) => v.trim().length > 0,   msg: "Company ID is required" },
     { test: (v) => /^[a-z0-9-]+$/.test(v.trim()), msg: "Use lowercase letters, numbers, and hyphens only" },
@@ -36,8 +37,8 @@ const RULES = {
   ],
 };
 
-function validate(fields) {
-  const errors = {};
+function validate(fields: Record<string, string>) {
+  const errors: Record<string, string> = {};
   for (const [key, rules] of Object.entries(RULES)) {
     for (const rule of rules) {
       if (!rule.test(fields[key] ?? "")) {
@@ -420,7 +421,7 @@ const styles = `
 
 /* ─── Sub-components ─────────────────────────────────────────────────────── */
 
-function FieldError({ msg }) {
+function FieldError({ msg }: { msg?: string | boolean | null }) {
   if (!msg) return null;
   return (
     <div className="lp-field-error" role="alert">
@@ -432,7 +433,7 @@ function FieldError({ msg }) {
   );
 }
 
-function EyeIcon({ open }) {
+function EyeIcon({ open }: { open: boolean }) {
   return open ? (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
       <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
@@ -447,7 +448,7 @@ function EyeIcon({ open }) {
   );
 }
 
-function Captcha({ verified, checking, onVerify, hasError }) {
+function Captcha({ verified, checking, onVerify, hasError }: { verified: boolean, checking: boolean, onVerify: () => void, hasError: boolean }) {
   return (
     <div
       className={`lp-captcha${verified ? " verified" : ""}${hasError ? " captcha-error" : ""}`}
@@ -480,25 +481,25 @@ export default function LoginPage() {
   const setAuth  = useAuthStore((s) => s.setAuth);
 
   const [fields, setFields] = useState({ company_id: "", employee_id: "", password: "" });
-  const [errors, setErrors] = useState({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [globalError, setGlobalError] = useState("");
   const [showPwd, setShowPwd]   = useState(false);
   const [loading, setLoading]   = useState(false);
-  const [touched, setTouched]   = useState({});
+  const [touched, setTouched]   = useState<Record<string, boolean>>({});
   const [captchaError, setCaptchaError] = useState(false);
   const { verified: captchaVerified, checking: captchaChecking, verify: verifyCaptcha } = useMockCaptcha();
 
-  const firstInputRef = useRef(null);
+  const firstInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => { firstInputRef.current?.focus(); }, []);
 
   /* Live validation on blur */
-  const handleBlur = (key) => {
+  const handleBlur = (key: string) => {
     setTouched((p) => ({ ...p, [key]: true }));
     const errs = validate(fields);
     setErrors((p) => ({ ...p, [key]: errs[key] }));
   };
 
-  const handleChange = (key, val) => {
+  const handleChange = (key: string, val: string) => {
     setFields((p) => ({ ...p, [key]: val }));
     if (touched[key]) {
       const errs = validate({ ...fields, [key]: val });
@@ -506,7 +507,7 @@ export default function LoginPage() {
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setGlobalError("");
 
@@ -574,7 +575,7 @@ export default function LoginPage() {
                 <path d="M2 6l7 4 7-4M9 10v6"/>
               </svg>
             </div>
-            <span className="lp-panel-logo-name">NexusCRM</span>
+            <span className="lp-panel-logo-name">IntelliCRM</span>
           </div>
 
           <div className="lp-panel-copy">
@@ -584,21 +585,6 @@ export default function LoginPage() {
             <p className="lp-panel-sub">
               Multi-tenant CRM built for teams who move fast and close faster.
             </p>
-          </div>
-
-          <div className="lp-panel-stats">
-            <div>
-              <span className="lp-panel-stat-val">12k+</span>
-              <span className="lp-panel-stat-label">Active users</span>
-            </div>
-            <div>
-              <span className="lp-panel-stat-val">98%</span>
-              <span className="lp-panel-stat-label">Uptime SLA</span>
-            </div>
-            <div>
-              <span className="lp-panel-stat-val">SOC 2</span>
-              <span className="lp-panel-stat-label">Certified</span>
-            </div>
           </div>
         </aside>
 

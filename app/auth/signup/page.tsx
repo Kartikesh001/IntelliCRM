@@ -24,7 +24,7 @@ import { useAuthStore } from "@/app/store/authStore";
 
 /* ─── Slug helper ────────────────────────────────────────────────────────── */
 
-function toSlug(str) {
+function toSlug(str: string) {
   return str
     .toLowerCase()
     .trim()
@@ -36,7 +36,7 @@ function toSlug(str) {
 
 /* ─── Password strength ──────────────────────────────────────────────────── */
 
-function getStrength(pwd) {
+function getStrength(pwd: string) {
   if (!pwd) return { level: 0, label: "", color: "" };
   let score = 0;
   if (pwd.length >= 8)                       score++;
@@ -52,7 +52,8 @@ function getStrength(pwd) {
 
 
 
-const STEP_RULES = [
+type Rule = { test: (v: string) => boolean; msg: string; };
+const STEP_RULES: Record<string, Rule[]>[] = [
   // Step 0: Workspace
   {
     company_name: [
@@ -94,9 +95,9 @@ const STEP_RULES = [
   },
 ];
 
-function validateStep(step, fields) {
+function validateStep(step: number, fields: Record<string, string>) {
   const rules = STEP_RULES[step];
-  const errors = {};
+  const errors: Record<string, string> = {};
   for (const [key, fieldRules] of Object.entries(rules)) {
     for (const rule of fieldRules) {
       if (!rule.test(fields[key] ?? "")) {
@@ -511,7 +512,7 @@ const styles = `
 
 /* ─── Shared sub-components ──────────────────────────────────────────────── */
 
-function FieldError({ msg }) {
+function FieldError({ msg }: { msg?: string | boolean | null }) {
   if (!msg) return null;
   return (
     <div className="su-field-error" role="alert">
@@ -523,7 +524,7 @@ function FieldError({ msg }) {
   );
 }
 
-function EyeToggle({ show, onToggle }) {
+function EyeToggle({ show, onToggle }: { show: boolean, onToggle: () => void }) {
   return (
     <button type="button" className="su-input-right" onClick={onToggle}
       aria-label={show ? "Hide password" : "Show password"}>
@@ -543,9 +544,9 @@ function EyeToggle({ show, onToggle }) {
   );
 }
 
-function StrengthMeter({ password }) {
-  const { level, label, color } = getStrength(password);
+function StrengthMeter({ password }: { password?: string }) {
   if (!password) return null;
+  const { level, label, color } = getStrength(password);
   return (
     <div className="su-strength">
       <div className="su-strength-bars">
@@ -564,7 +565,7 @@ function StrengthMeter({ password }) {
   );
 }
 
-function CaptchaWidget({ verified, checking, onVerify, hasError }) {
+function CaptchaWidget({ verified, checking, onVerify, hasError }: { verified: boolean, checking: boolean, onVerify: () => void, hasError: boolean }) {
   return (
     <div
       className={`su-captcha${verified ? " verified" : ""}${hasError ? " has-error" : ""}`}
@@ -592,17 +593,25 @@ function CaptchaWidget({ verified, checking, onVerify, hasError }) {
 
 /* ─── Step components ────────────────────────────────────────────────────── */
 
-function StepWorkspace({ fields, errors, touched, onChange, onBlur }) {
+interface StepProps {
+  fields: Record<string, string>;
+  errors: Record<string, string>;
+  touched: Record<string, boolean>;
+  onChange: (key: string, val: string) => void;
+  onBlur: (key: string) => void;
+}
+
+function StepWorkspace({ fields, errors, touched, onChange, onBlur }: StepProps) {
   const slugRef = useRef(false);
 
-  const handleNameChange = (val) => {
+  const handleNameChange = (val: string) => {
     onChange("company_name", val);
     if (!slugRef.current) {
       onChange("company_id", toSlug(val));
     }
   };
 
-  const handleSlugChange = (val) => {
+  const handleSlugChange = (val: string) => {
     slugRef.current = true; // user manually edited — stop auto-sync
     onChange("company_id", toSlug(val));
   };
@@ -641,7 +650,7 @@ function StepWorkspace({ fields, errors, touched, onChange, onBlur }) {
         />
         {fields.company_id && !errors.company_id && (
           <div className="su-slug-chip">
-            app.nexuscrm.io / {fields.company_id}
+            app.intellicrm.io / {fields.company_id}
           </div>
         )}
         <FieldError msg={touched.company_id && errors.company_id} />
@@ -656,7 +665,7 @@ function StepWorkspace({ fields, errors, touched, onChange, onBlur }) {
   );
 }
 
-function StepDetails({ fields, errors, touched, onChange, onBlur }) {
+function StepDetails({ fields, errors, touched, onChange, onBlur }: StepProps) {
   return (
     <div className="su-step-content">
       <div className="su-field">
@@ -710,9 +719,20 @@ function StepDetails({ fields, errors, touched, onChange, onBlur }) {
   );
 }
 
+interface StepSecurityProps extends StepProps {
+  showPwd: boolean;
+  setShowPwd: React.Dispatch<React.SetStateAction<boolean>>;
+  showConfirm: boolean;
+  setShowConfirm: React.Dispatch<React.SetStateAction<boolean>>;
+  captchaVerified: boolean;
+  captchaChecking: boolean;
+  verifyCaptcha: () => void;
+  captchaError: boolean;
+}
+
 function StepSecurity({ fields, errors, touched, onChange, onBlur,
   showPwd, setShowPwd, showConfirm, setShowConfirm,
-  captchaVerified, captchaChecking, verifyCaptcha, captchaError }) {
+  captchaVerified, captchaChecking, verifyCaptcha, captchaError }: StepSecurityProps) {
   return (
     <div className="su-step-content">
       <div className="su-field">
@@ -801,15 +821,15 @@ export default function SignupPage() {
     password:     "",
     confirm_password: "",
   });
-  const [errors,  setErrors]  = useState({});
-  const [touched, setTouched] = useState({});
+  const [errors,  setErrors]  = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [showPwd, setShowPwd]           = useState(false);
   const [showConfirm, setShowConfirm]   = useState(false);
   const [captchaError, setCaptchaError] = useState(false);
   const { verified: captchaVerified, checking: captchaChecking, verify: verifyCaptcha } =
     useMockCaptcha();
 
-  const onChange = useCallback((key, val) => {
+  const onChange = useCallback((key: string, val: string) => {
     setFields((p) => ({ ...p, [key]: val }));
     if (touched[key]) {
       const errs = validateStep(step, { ...fields, [key]: val });
@@ -817,7 +837,7 @@ export default function SignupPage() {
     }
   }, [fields, touched, step]);
 
-  const onBlur = useCallback((key) => {
+  const onBlur = useCallback((key: string) => {
     setTouched((p) => ({ ...p, [key]: true }));
     const errs = validateStep(step, fields);
     setErrors((p) => ({ ...p, [key]: errs[key] }));
@@ -834,7 +854,7 @@ export default function SignupPage() {
     setGlobalError("");
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (step < 2) { advanceStep(); return; }
 
@@ -900,7 +920,7 @@ export default function SignupPage() {
                 <path d="M2 6l7 4 7-4M9 10v6"/>
               </svg>
             </div>
-            <span className="su-logo-name">NexusCRM</span>
+            <span className="su-logo-name">IntelliCRM</span>
           </div>
 
           <div>
